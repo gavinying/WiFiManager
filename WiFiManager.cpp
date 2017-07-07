@@ -122,6 +122,9 @@ void WiFiManager::setupConfigPortal() {
   server->on("/0wifi", std::bind(&WiFiManager::handleWifi, this, false));
   server->on("/wifisave", std::bind(&WiFiManager::handleWifiSave, this));
   server->on("/i", std::bind(&WiFiManager::handleInfo, this));
+  server->on("/wifi-json", std::bind(&WiFiManager::handleWifiJson, this, true));
+  server->on("/wifisave-json", std::bind(&WiFiManager::handleWifiSaveJson, this));
+  server->on("/i-json", std::bind(&WiFiManager::handleInfoJson, this));
   server->on("/r", std::bind(&WiFiManager::handleReset, this));
   //server->on("/generate_204", std::bind(&WiFiManager::handle204, this));  //Android/Chrome OS captive portal check.
   server->on("/fwlink", std::bind(&WiFiManager::handleRoot, this));  //Microsoft captive portal. Maybe not needed. Might be handled by notFound handler.
@@ -779,4 +782,152 @@ String WiFiManager::toStringIp(IPAddress ip) {
   }
   res += String(((ip >> 8 * 3)) & 0xFF);
   return res;
+}
+
+
+void WiFiManager::handleWifiSaveJson() {
+  DEBUG_WM(F("WiFi save"));
+
+  //SAVE/connect here
+  _ssid = server->arg("s").c_str();
+  _pass = server->arg("p").c_str();
+
+  //parameters
+  for (int i = 0; i < _paramsCount; i++) {
+    if (_params[i] == NULL) {
+      break;
+    }
+    //read parameter
+    String value = server->arg(_params[i]->getID()).c_str();
+    //store it in array
+    value.toCharArray(_params[i]->_value, _params[i]->_length);
+    DEBUG_WM(F("Parameter"));
+    DEBUG_WM(_params[i]->getID());
+    DEBUG_WM(value);
+  }
+
+  if (server->arg("ip") != "") {
+    DEBUG_WM(F("static ip"));
+    DEBUG_WM(server->arg("ip"));
+    //_sta_static_ip.fromString(server->arg("ip"));
+    String ip = server->arg("ip");
+    optionalIPFromString(&_sta_static_ip, ip.c_str());
+  }
+  if (server->arg("gw") != "") {
+    DEBUG_WM(F("static gateway"));
+    DEBUG_WM(server->arg("gw"));
+    String gw = server->arg("gw");
+    optionalIPFromString(&_sta_static_gw, gw.c_str());
+  }
+  if (server->arg("sn") != "") {
+    DEBUG_WM(F("static netmask"));
+    DEBUG_WM(server->arg("sn"));
+    String sn = server->arg("sn");
+    optionalIPFromString(&_sta_static_sn, sn.c_str());
+  }
+
+  String response = "{\"result\":\"Credentials Saved\"}";
+
+  server->send(200, "application/json", response);
+
+  DEBUG_WM(F("Sent wifi save page"));
+
+  connect = true; //signal ready to connect/reset
+}
+
+
+/** Handle the info page in json format */
+void WiFiManager::handleInfoJson() {
+  DEBUG_WM(F("Info"));
+
+  String response = "{";
+  response += "\"ChipId\":\"";
+  response += ESP.getChipId();
+  response += "\",\"FlashChipId\":\"";
+  response += ESP.getFlashChipId();
+  response += "\",\"FlashChipSize\":\"";
+  response += ESP.getFlashChipSize();
+  response += "\",\"FlashChipRealSize\":\"";
+  response += ESP.getFlashChipRealSize();
+  response += "\",\"softAPIP\":\"";
+  response += WiFi.softAPIP().toString();
+  response += "\",\"softAPmacAddress\":\"";
+  response += WiFi.softAPmacAddress();
+  response += "\",\"macAddress\":\"";
+  response += WiFi.macAddress();
+  response += "\"}";
+
+  server->send(200, "application/json", response);
+
+  DEBUG_WM(F("Sent info in json format"));
+}
+
+
+void WiFiManager::handleWifiJson(boolean scan) {
+
+  String response = "[";
+
+  if (scan) {
+    int n = WiFi.scanNetworks();
+    DEBUG_WM(F("Scan done"));
+    if (n == 0) {
+      DEBUG_WM(F("No networks found"));
+    } else {
+      //sort networks
+      int indices[n];
+      for (int i = 0; i < n; i++) {
+        indices[i] = i;
+      }
+      // RSSI SORT
+
+      // old sort
+      for (int i = 0; i < n; i++) {
+        for (int j = i + 1; j < n; j++) {
+          if (WiFi.RSSI(indices[j]) > WiFi.RSSI(indices[i])) {
+            std::swap(indices[i], indices[j]);
+          }
+        }
+      }
+
+    // remove duplicates ( must be RSSI sorted )
+    if (_removeDuplicateAPs) {
+      String cssid;
+      for (int i = 0; i < n; i++) {
+        if (indices[i] == -1) continue;
+        cssid = WiFi.SSID(indices[i]);
+        for (int j = i + 1; j < n; j++) {
+          if (cssid == WiFi.SSID(indices[j])) {
+            DEBUG_WM("DUP AP: " + WiFi.SSID(indices[j]));
+            indices[j] = -1; // set dup aps to index -1
+          }
+        }
+      }
+    }
+
+    //display networks in page
+    for (int i = 0; i < n; i++) {
+      if (indices[i] == -1) continue; // skip dups
+      DEBUG_WM(WiFi.SSID(indices[i]));
+      DEBUG_WM(WiFi.RSSI(indices[i]));
+      int quality = getRSSIasQuality(WiFi.RSSI(indices[i]));
+      if (_minimumQuality == -1 || _minimumQuality < quality) {
+        String rssiQ;
+        rssiQ += quality;
+        if(i > 0)
+          response += ",";
+        response += "{\"ssid\":\"";
+        response += WiFi.SSID(indices[i]);
+        response += "\",\"rssi\":\"";
+        response += rssiQ;
+        response += "\"}";
+      } else {
+        DEBUG_WM(F("Skipping due to quality"));
+      }
+    }
+  }
+}
+  response += "]";
+  server->send(200, "application/json", response);
+
+  DEBUG_WM(F("Sent wifi scan info in json format"));
 }
