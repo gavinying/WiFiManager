@@ -5,10 +5,12 @@
    inspired by:
    http://www.esp8266.com/viewtopic.php?f=29&t=2520
    https://github.com/chriscook8/esp-arduino-apboot
-   https://github.com/esp8266/Arduino/tree/esp8266/hardware/esp8266com/esp8266/libraries/DNSServer/examples/CaptivePortalAdvanced
-   This version built by Ken Taylor https://github.com/kentaylor
+   https://github.com/esp8266/Arduino/blob/master/libraries/DNSServer/examples/CaptivePortalAdvanced/
+   https://github.com/tzapu/WiFiManager
+   Forked from Ken Taylor https://github.com/kentaylor
+   Built by Shaodong Ying https://github.com/helloysd
    Licensed under MIT license
- **************************************************************/
+**************************************************************/
 
 #ifndef WiFiManager_h
 #define WiFiManager_h
@@ -23,6 +25,8 @@
 extern "C" {
   #include "user_interface.h"
 }
+
+#define SSID_PREFIX   "OptimLink-"
 
 #define WFM_LABEL_BEFORE 1
 #define WFM_LABEL_AFTER 2
@@ -40,7 +44,7 @@ const char HTTP_FORM_START[] PROGMEM      = "<form method=\"get\" action=\"wifis
 const char HTTP_FORM_LABEL[] PROGMEM      = "<label for=\"{i}\">{p}</label>";
 const char HTTP_FORM_PARAM[] PROGMEM      = "<input id=\"{i}\" name=\"{n}\" length={l} placeholder=\"{p}\" value=\"{v}\" {c}>";
 const char HTTP_FORM_END[] PROGMEM        = "<button class=\"btn\" type=\"submit\">save</button></form>";
-const char HTTP_SAVED[] PROGMEM           = "<div class=\"msg\"><strong>Credentials Saved</strong><br>Trying to connect ESP to the {x} network.<br>Give it 10 seconds or so and check <a href=\"/\">how it went.</a> <p/>The {v} network you are connected to will be restarted on the radio channel of the {x} network. You may have to manually reconnect to the {v} network.</div>";
+const char HTTP_SAVED[] PROGMEM           = "<div class=\"msg\"><strong>Credentials Saved</strong>.<br><p/>Trying to connect the device to access point <strong>{x}</strong>.<br><br>Please wait for 10 seconds or so and then check the network status <a href=\"/\">Here</a>. <br> <p/>The {v} network you are connected to will be restarted on the radio channel of the {x} network. You may have to manually reconnect to the {v} network.</div>";
 const char HTTP_END[] PROGMEM             = "</div></body></html>";
 
 #define WIFI_MANAGER_MAX_PARAMS 10
@@ -147,7 +151,7 @@ class WiFiManager
     unsigned long _configPortalStart      = 0;
     /* hostname for mDNS. Set to a valid internet address so that user
     will see an information page if they are connected to the wrong network */
-	const char *myHostname = "wifi.urremote.com";
+	const char *myHostname = "iot.optimlink.com";
 	int numberOfNetworks;
 	int *networkIndices;
     int **networkIndicesptr = &networkIndices;
