@@ -133,7 +133,7 @@ void WiFiManager::setupConfigPortal() {
 	server->on("/", std::bind(&WiFiManager::handleRoot, this));
 	server->on("/wifi", std::bind(&WiFiManager::handleWifi, this));
 	server->on("/wifisave", std::bind(&WiFiManager::handleWifiSave, this));
-	server->on("/close", std::bind(&WiFiManager::handleServerClose, this));
+	server->on("/callback", std::bind(&WiFiManager::handleServerClose, this));
 	server->on("/i", std::bind(&WiFiManager::handleInfo, this));
 	server->on("/r", std::bind(&WiFiManager::handleReset, this));
 	server->on("/state", std::bind(&WiFiManager::handleState, this));
@@ -551,7 +551,6 @@ void WiFiManager::handleWifi() {
 		page += item;
 		page += "<br/>";
 	}
-
 	page += FPSTR(HTTP_FORM_END);
 	page += FPSTR(HTTP_END);
 
@@ -632,17 +631,17 @@ void WiFiManager::handleServerClose() {
 	page += _customHeadElement;
 	page += FPSTR(HTTP_HEAD_END);
 	page += F("<div class=\"msg\">");
-	page += F("My network is <strong>");
+	page += F("The device has connected to network <strong>");
 	page += WiFi.SSID();
-	page += F("</strong><br>");
-	page += F("My IP address is <strong>");
-	page += WiFi.localIP().toString();
-	page += F("</strong><br><br>");
-	page += F("Configuration server closed...<br><br>");
+	page += F("</strong>, now it is going to switch the AP mode off. <br><br>");
+	page += F("Your phone will be soon <strong>disconnected</strong> from the device and switch to the other networks. <br><br>");
+  page += F("please wait for a moment and <strong>refresh</strong> your page. <br>");
+  //page += F("Configuration server closed...<br><br>");
 	//page += F("Push button on device to restart configuration server!");
 	page += FPSTR(HTTP_END);
 
 	server->send(200, "text/html", page);
+  delay(1000);
 	stopConfigPortal = true; //signal ready to shutdown config portal
 	DEBUG_WM(F("Sent server close page"));
 }
@@ -692,7 +691,7 @@ void WiFiManager::handleInfo() {
 	page += WiFi.macAddress();
 	page += F("</td></tr>");
 	page += F("</tbody></table>");
-/*
+
    page += F("<h2>Available Pages</h2>");
    page += F("<table class=\"table\">");
    page += F("<thead><tr><th>Page</th><th>Function</th></tr></thead><tbody>");
@@ -702,7 +701,7 @@ void WiFiManager::handleInfo() {
    page += F("<td>Show WiFi scan results and enter WiFi configuration.</td></tr>");
    page += F("<tr><td><a href=\"/wifisave\">/wifisave\</a></td>");
    page += F("<td>Save WiFi configuration information and configure device. Needs variables supplied.</td></tr>");
-   page += F("<tr><td><a href=\"/close\">/close</a></td>");
+   page += F("<tr><td><a href=\"/callback\">/close</a></td>");
    page += F("<td>Close the configuration server and configuration WiFi network.</td></tr>");
    page += F("<tr><td><a href=\"/i\">/i</a></td>");
    page += F("<td>This page.</td></tr>");
@@ -713,9 +712,9 @@ void WiFiManager::handleInfo() {
    page += F("<tr><td><a href=\"/scan\">/scan</a></td>");
    page += F("<td>Run a WiFi scan and return results in JSON format. Interface for programmatic WiFi configuration.</td></tr>");
    page += F("</table>");
- */
+
   page += F("<p/>This version is built by <a href=\"mailto:helloysd@gmail.com\">Shaodong Ying</a>.");
-	page += F("<p/>More information at <a href=\"https://optimlink.com\">https://optimlink.com</a>.");
+	page += F("<p/>More information at <a href=\"https://optimlink.com\" target=\"_blank\">https://optimlink.com</a>.");
 	page += FPSTR(HTTP_END);
 
 	server->send(200, "text/html", page);
@@ -746,6 +745,7 @@ void WiFiManager::handleState() {
 	page += F("\"SSID\":\"");
 	page += WiFi.SSID();
 	page += F("\"}");
+
 	server->send(200, "application/json", page);
 	DEBUG_WM(F("Sent state page in json format"));
 }
@@ -788,6 +788,7 @@ void WiFiManager::handleScan() {
 	}
 	free(indices); //indices array no longer required so free memory
 	page += F("]}");
+
 	server->send(200, "application/json", page);
 	DEBUG_WM(F("Sent WiFi scan data ordered by signal strength in json format"));
 }
