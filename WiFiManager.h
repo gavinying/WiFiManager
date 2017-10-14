@@ -151,7 +151,7 @@ class WiFiManager
     unsigned long _configPortalStart      = 0;
     /* hostname for mDNS. Set to a valid internet address so that user
     will see an information page if they are connected to the wrong network */
-	const char *myHostname = "ourair.info";
+	const char *myHostname = "iotman.herokuapp.com";
 	int numberOfNetworks;
 	int *networkIndices;
     int **networkIndicesptr = &networkIndices;
@@ -189,6 +189,10 @@ class WiFiManager
     void          handleNotFound();
     boolean       captivePortal();
     void          reportStatus(String &page);
+
+    void          handleWifiJson();
+    void          handleWifiSaveJson();
+    void          handleInfoJson();
 
     // DNS server
     const byte    DNS_PORT = 53;

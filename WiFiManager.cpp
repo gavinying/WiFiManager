@@ -138,6 +138,12 @@ void WiFiManager::setupConfigPortal() {
 	server->on("/r", std::bind(&WiFiManager::handleReset, this));
 	server->on("/state", std::bind(&WiFiManager::handleState, this));
 	server->on("/scan", std::bind(&WiFiManager::handleScan, this));
+
+  server->on("/wifijson", std::bind(&WiFiManager::handleWifiJson, this));
+  server->on("/wifisavejson", std::bind(&WiFiManager::handleWifiSaveJson, this));
+  //server->on("/infojson", std::bind(&WiFiManager::handleInfoJson, this));
+  server->on("/connect", std::bind(&WiFiManager::handleInfoJson, this));
+
 	server->onNotFound (std::bind(&WiFiManager::handleNotFound, this));
 	server->begin(); // Web server start
 	DEBUG_WM(F("HTTP server started"));
@@ -558,6 +564,37 @@ void WiFiManager::handleWifi() {
 	DEBUG_WM(F("Sent config page"));
 }
 
+/** Wifi config page handler */
+void WiFiManager::handleWifiJson() {
+	server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+	server->sendHeader("Pragma", "no-cache");
+	server->sendHeader("Expires", "-1");
+
+  String page = "[";
+  if (numberOfNetworks > 0) {
+    for (int i = 0; i < numberOfNetworks; i++) {
+      if(networkIndices[i] == -1) continue; // skip dups and those that are below the required quality
+      DEBUG_WM(WiFi.SSID(networkIndices[i]));
+  		DEBUG_WM(WiFi.RSSI(networkIndices[i]));
+  		int quality = getRSSIasQuality(WiFi.RSSI(networkIndices[i]));
+      String rssiQ;
+			rssiQ += quality;
+      if(i > 0) page += ",";
+      page += "{\"ssid\":\"";
+      page += WiFi.SSID(networkIndices[i]);
+      page += "\",\"rssi\":\"";
+      page += rssiQ;
+      page += "\",\"encrypt\":\"";
+      page += (WiFi.encryptionType(networkIndices[i]) != ENC_TYPE_NONE)?"1":"0";
+      page += "\"}";
+    }
+  }
+  page += "]";
+
+  server->send(200, "application/json", page);
+  DEBUG_WM(F("Sent wifi config page in json format"));
+}
+
 /** Handle the WLAN save form and redirect to WLAN config page again */
 void WiFiManager::handleWifiSave() {
 	DEBUG_WM(F("WiFi save"));
@@ -614,6 +651,55 @@ void WiFiManager::handleWifiSave() {
 	server->send(200, "text/html", page);
 
 	DEBUG_WM(F("Sent wifi save page"));
+
+	connect = true; //signal ready to connect/reset
+}
+
+void WiFiManager::handleWifiSaveJson() {
+	DEBUG_WM(F("WiFi save - json"));
+
+	//SAVE/connect here
+	_ssid = server->arg("s").c_str();
+	_pass = server->arg("p").c_str();
+
+	//parameters
+	for (int i = 0; i < _paramsCount; i++) {
+		if (_params[i] == NULL) {
+			break;
+		}
+		//read parameter
+		String value = server->arg(_params[i]->getID()).c_str();
+		//store it in array
+		value.toCharArray(_params[i]->_value, _params[i]->_length);
+		DEBUG_WM(F("Parameter"));
+		DEBUG_WM(_params[i]->getID());
+		DEBUG_WM(value);
+	}
+
+	if (server->arg("ip") != "") {
+		DEBUG_WM(F("static ip"));
+		DEBUG_WM(server->arg("ip"));
+		//_sta_static_ip.fromString(server->arg("ip"));
+		String ip = server->arg("ip");
+		optionalIPFromString(&_sta_static_ip, ip.c_str());
+	}
+	if (server->arg("gw") != "") {
+		DEBUG_WM(F("static gateway"));
+		DEBUG_WM(server->arg("gw"));
+		String gw = server->arg("gw");
+		optionalIPFromString(&_sta_static_gw, gw.c_str());
+	}
+	if (server->arg("sn") != "") {
+		DEBUG_WM(F("static netmask"));
+		DEBUG_WM(server->arg("sn"));
+		String sn = server->arg("sn");
+		optionalIPFromString(&_sta_static_sn, sn.c_str());
+	}
+
+  String page = "{\"result\":\"Credentials Saved\"}";
+
+  server->send(200, "application/json", page);
+	DEBUG_WM(F("Sent wifi save page in json format"));
 
 	connect = true; //signal ready to connect/reset
 }
@@ -719,6 +805,37 @@ void WiFiManager::handleInfo() {
 
 	server->send(200, "text/html", page);
 	DEBUG_WM(F("Sent info page"));
+}
+
+void WiFiManager::handleInfoJson() {
+	DEBUG_WM(F("Info - json"));
+	server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+	server->sendHeader("Pragma", "no-cache");
+	server->sendHeader("Expires", "-1");
+
+  String page = "{";
+  page += "\"ChipId\":\"";
+  page += ESP.getChipId();
+  page += "\",\"FlashChipId\":\"";
+  page += ESP.getFlashChipId();
+  page += "\",\"FlashChipSize\":\"";
+  page += ESP.getFlashChipSize();
+  page += "\",\"FlashChipRealSize\":\"";
+  page += ESP.getFlashChipRealSize();
+  page += "\",\"softAPIP\":\"";
+  page += WiFi.softAPIP().toString();
+  page += "\",\"softAPmacAddress\":\"";
+  page += WiFi.softAPmacAddress();
+  page += "\",\"SSID\":\"";
+  page += WiFi.SSID();
+  page += "\",\"localIP\":\"";
+  page += WiFi.localIP().toString();
+  page += "\",\"macAddress\":\"";
+  page += WiFi.macAddress();
+  page += "\"}";
+
+  server->send(200, "application/json", page);
+	DEBUG_WM(F("Sent info page in json format"));
 }
 
 /** Handle the state page */
@@ -843,9 +960,9 @@ void WiFiManager::handleNotFound() {
 boolean WiFiManager::captivePortal() {
 	if (!isIp(server->hostHeader()) && server->hostHeader() != (String(myHostname))) {
 		DEBUG_WM(F("Request redirected to captive portal"));
-		server->sendHeader("Location", ("http://") +String(myHostname), true);
+		server->sendHeader("Location", ("http://") + String(myHostname), true);
 		server->setContentLength(0);
-		server->send ( 302, "text/plain", ""); // Empty content inhibits Content-length header so we have to close the socket ourselves.
+		server->send (302, "text/plain", ""); // Empty content inhibits Content-length header so we have to close the socket ourselves.
 //    server->client().stop(); // Stop is needed because we sent no content length
 		return true;
 	}
