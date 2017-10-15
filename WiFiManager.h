@@ -27,6 +27,7 @@ extern "C" {
 }
 
 #define SSID_PREFIX   "OptimLink-"
+#define MDNS_HOSTNAME "iotman.optimlink.com"
 
 #define WFM_LABEL_BEFORE 1
 #define WFM_LABEL_AFTER 2
@@ -151,7 +152,7 @@ class WiFiManager
     unsigned long _configPortalStart      = 0;
     /* hostname for mDNS. Set to a valid internet address so that user
     will see an information page if they are connected to the wrong network */
-	const char *myHostname = "iotman.herokuapp.com";
+	const char *myHostname = MDNS_HOSTNAME;
 	int numberOfNetworks;
 	int *networkIndices;
     int **networkIndicesptr = &networkIndices;
