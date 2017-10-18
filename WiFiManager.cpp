@@ -569,6 +569,7 @@ void WiFiManager::handleWifiJson() {
 	server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
 	server->sendHeader("Pragma", "no-cache");
 	server->sendHeader("Expires", "-1");
+  server->sendHeader("Access-Control-Allow-Origin", "*");
 
   String page = "[";
   if (numberOfNetworks > 0) {
@@ -696,6 +697,11 @@ void WiFiManager::handleWifiSaveJson() {
 		optionalIPFromString(&_sta_static_sn, sn.c_str());
 	}
 
+  server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  server->sendHeader("Pragma", "no-cache");
+  server->sendHeader("Expires", "-1");
+  server->sendHeader("Access-Control-Allow-Origin", "*");
+
   String page = "{\"result\":\"Credentials Saved\"}";
 
   server->send(200, "application/json", page);
@@ -812,6 +818,7 @@ void WiFiManager::handleInfoJson() {
 	server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
 	server->sendHeader("Pragma", "no-cache");
 	server->sendHeader("Expires", "-1");
+  server->sendHeader("Access-Control-Allow-Origin", "*");
 
   String page = "{";
   page += "\"ChipId\":\"";
@@ -873,6 +880,7 @@ void WiFiManager::handleScan() {
 	server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
 	server->sendHeader("Pragma", "no-cache");
 	server->sendHeader("Expires", "-1");
+  server->sendHeader("Access-Control-Allow-Origin", "*");
 
 	int n;
 	int *indices;
