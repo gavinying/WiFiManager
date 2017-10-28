@@ -26,6 +26,8 @@ extern "C" {
   #include "user_interface.h"
 }
 
+//#define ENABLE_CAPTIVE
+
 #define SSID_PREFIX   "OptimLink-"
 #define MDNS_HOSTNAME "iotman.optimlink.com"
 

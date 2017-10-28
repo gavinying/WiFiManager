@@ -133,7 +133,7 @@ void WiFiManager::setupConfigPortal() {
 	server->on("/", std::bind(&WiFiManager::handleRoot, this));
 	server->on("/wifi", std::bind(&WiFiManager::handleWifi, this));
 	server->on("/wifisave", std::bind(&WiFiManager::handleWifiSave, this));
-	server->on("/callback", std::bind(&WiFiManager::handleServerClose, this));
+	server->on("/close", std::bind(&WiFiManager::handleServerClose, this));
 	server->on("/i", std::bind(&WiFiManager::handleInfo, this));
 	server->on("/r", std::bind(&WiFiManager::handleReset, this));
 	server->on("/state", std::bind(&WiFiManager::handleState, this));
@@ -141,8 +141,7 @@ void WiFiManager::setupConfigPortal() {
 
   server->on("/wifijson", std::bind(&WiFiManager::handleWifiJson, this));
   server->on("/wifisavejson", std::bind(&WiFiManager::handleWifiSaveJson, this));
-  //server->on("/infojson", std::bind(&WiFiManager::handleInfoJson, this));
-  server->on("/connect", std::bind(&WiFiManager::handleInfoJson, this));
+  server->on("/infojson", std::bind(&WiFiManager::handleInfoJson, this));
 
 	server->onNotFound (std::bind(&WiFiManager::handleNotFound, this));
 	server->begin(); // Web server start
@@ -424,9 +423,11 @@ void WiFiManager::reportStatus(String &page){
 /** Handle root or redirect to captive portal */
 void WiFiManager::handleRoot() {
 	DEBUG_WM(F("Handle root"));
+#ifdef ENABLE_CAPTIVE
 	if (captivePortal()) { // If caprive portal redirect instead of displaying the error page.
 		return;
 	}
+#endif
 	server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
 	server->sendHeader("Pragma", "no-cache");
 	server->sendHeader("Expires", "-1");
@@ -716,7 +717,9 @@ void WiFiManager::handleServerClose() {
 	server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
 	server->sendHeader("Pragma", "no-cache");
 	server->sendHeader("Expires", "-1");
-	String page = FPSTR(HTTP_HEAD);
+  server->sendHeader("Access-Control-Allow-Origin", "*");
+
+  String page = FPSTR(HTTP_HEAD);
 	page.replace("{v}", "Close Server");
 	page += FPSTR(HTTP_SCRIPT);
 	page += FPSTR(HTTP_STYLE);
@@ -851,6 +854,8 @@ void WiFiManager::handleState() {
 	server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
 	server->sendHeader("Pragma", "no-cache");
 	server->sendHeader("Expires", "-1");
+  server->sendHeader("Access-Control-Allow-Origin", "*");
+
 	String page = F("{\"Soft_AP_IP\":\"");
 	page += WiFi.softAPIP().toString();
 	page += F("\",\"Soft_AP_MAC\":\"");
@@ -942,9 +947,11 @@ void WiFiManager::handleReset() {
 }
 
 void WiFiManager::handleNotFound() {
+#ifdef ENABLE_CAPTIVE
 	if (captivePortal()) { // If caprive portal redirect instead of displaying the error page.
 		return;
 	}
+#endif
 	String message = "File Not Found\n\n";
 	message += "URI: ";
 	message += server->uri();
