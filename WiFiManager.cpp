@@ -72,6 +72,8 @@ const char* WiFiManagerParameter::getCustomHTML() {
 }
 
 WiFiManager::WiFiManager() {
+  // Set hostname
+  strcpy(myHostname, DEFAULT_HOSTNAME);
 	//Do a network scan before setting up an access point so as not to close WiFiNetwork while scanning.
 	numberOfNetworks = scanWifiNetworks(networkIndicesptr);
 }
@@ -133,7 +135,7 @@ void WiFiManager::setupConfigPortal() {
 	server->on("/", std::bind(&WiFiManager::handleRoot, this));
 	server->on("/wifi", std::bind(&WiFiManager::handleWifi, this));
 	server->on("/wifisave", std::bind(&WiFiManager::handleWifiSave, this));
-	server->on("/close", std::bind(&WiFiManager::handleServerClose, this));
+	server->on("/done", std::bind(&WiFiManager::handleServerClose, this));
 	server->on("/i", std::bind(&WiFiManager::handleInfo, this));
 	server->on("/r", std::bind(&WiFiManager::handleReset, this));
 	server->on("/state", std::bind(&WiFiManager::handleState, this));
@@ -423,11 +425,10 @@ void WiFiManager::reportStatus(String &page){
 /** Handle root or redirect to captive portal */
 void WiFiManager::handleRoot() {
 	DEBUG_WM(F("Handle root"));
-#ifdef ENABLE_CAPTIVE
-	if (captivePortal()) { // If caprive portal redirect instead of displaying the error page.
+	if (_captive && captivePortal()) { // If caprive portal redirect instead of displaying the error page.
 		return;
 	}
-#endif
+
 	server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
 	server->sendHeader("Pragma", "no-cache");
 	server->sendHeader("Expires", "-1");
@@ -726,11 +727,14 @@ void WiFiManager::handleServerClose() {
 	page += _customHeadElement;
 	page += FPSTR(HTTP_HEAD_END);
 	page += F("<div class=\"msg\">");
-	page += F("The device has connected to network <strong>");
-	page += WiFi.SSID();
-	page += F("</strong>, now it is going to switch the AP mode off. <br><br>");
-	page += F("Your phone will be soon <strong>disconnected</strong> from the device and switch to the other networks. <br><br>");
-  page += F("please wait for a moment and <strong>refresh</strong> your page. <br>");
+	page += F("Device ");
+  page += ESP.getChipId();
+  page += F(" has successfully connected to WiFi network: <strong>");
+  page += WiFi.SSID();
+	page += F("</strong>. <br><br> AP mode will be switched off. <br><br>");
+	page += F("Your phone will be temperarily <strong>disconnected</strong> and switch to the other WiFi network soon. <br><br>");
+  //page += F("Please wait for a while and <strong>refresh</strong> this page. <br>");
+  page += F("Please wait for a while and <a href=\"http://optimlink.com\">refresh</a> this page. <br>");
   //page += F("Configuration server closed...<br><br>");
 	//page += F("Push button on device to restart configuration server!");
 	page += FPSTR(HTTP_END);
@@ -796,7 +800,7 @@ void WiFiManager::handleInfo() {
    page += F("<td>Show WiFi scan results and enter WiFi configuration.</td></tr>");
    page += F("<tr><td><a href=\"/wifisave\">/wifisave\</a></td>");
    page += F("<td>Save WiFi configuration information and configure device. Needs variables supplied.</td></tr>");
-   page += F("<tr><td><a href=\"/callback\">/close</a></td>");
+   page += F("<tr><td><a href=\"/done\">/close</a></td>");
    page += F("<td>Close the configuration server and configuration WiFi network.</td></tr>");
    page += F("<tr><td><a href=\"/i\">/i</a></td>");
    page += F("<td>This page.</td></tr>");
@@ -947,11 +951,10 @@ void WiFiManager::handleReset() {
 }
 
 void WiFiManager::handleNotFound() {
-#ifdef ENABLE_CAPTIVE
-	if (captivePortal()) { // If caprive portal redirect instead of displaying the error page.
+	if (_captive && captivePortal()) { // If caprive portal redirect instead of displaying the error page.
 		return;
 	}
-#endif
+
 	String message = "File Not Found\n\n";
 	message += "URI: ";
 	message += server->uri();
@@ -1099,4 +1102,18 @@ String WiFiManager::toStringIp(IPAddress ip) {
 	}
 	res += String(((ip >> 8 * 3)) & 0xFF);
 	return res;
+}
+
+void WiFiManager::setCaptiveMode(boolean captive) {
+  _captive = captive;
+}
+
+boolean WiFiManager::setHostname(const char *hostname) {
+  int src_size = sizeof(hostname);
+  if(src_size > HOSTNAME_LENGTH) {
+    return false;
+  }
+  strncpy(myHostname, hostname, src_size);
+  myHostname[src_size-1] = '\0';
+  return true;
 }
